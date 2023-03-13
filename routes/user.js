@@ -8,9 +8,6 @@ const {
 const router = require("express").Router();
 //GET ALL USERS
 router.get("/", verifyToken, userController.getAllUsers);
-router.get("/test", (req, res, next) => {
-  res.status(200).json({ success: "Hello Server" });
-});
 
 //DELETE USER
 router.delete(
