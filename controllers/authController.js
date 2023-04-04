@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const authService = require('../services/authServices')
 
 let refreshTokens = [];
 
@@ -13,6 +14,7 @@ const authController = {
 
       //Create new user
       const newUser = await new User({
+        userId: req.body.userId,
         username: req.body.username,
         email: req.body.email,
         password: hashed,
@@ -52,18 +54,16 @@ const authController = {
   loginUser: async (req, res) => {
     try {
       const user = await User.findOne({ username: req.body.username });
-      if (!user) {
-        res.status(404).json("Incorrect username");
-      }
       const validPassword = await bcrypt.compare(
         req.body.password,
         user.password
       );
-      if (!validPassword) {
+      if (!user) {
+        res.status(404).json("Incorrect username");
+      } else if (!validPassword) {
         res.status(404).json("Incorrect password");
-      }
-      if (user && validPassword) {
-        //Generate access token
+      } else if (user && validPassword) {
+        //Generate access 
         const accessToken = authController.generateAccessToken(user);
         //Generate refresh token
         const refreshToken = authController.generateRefreshToken(user);
@@ -71,7 +71,7 @@ const authController = {
         //STORE REFRESH TOKEN IN COOKIE
         res.cookie("refreshToken", refreshToken, {
           httpOnly: true,
-          secure:false,
+          secure: false,
           path: "/",
           sameSite: "strict",
         });
@@ -80,6 +80,35 @@ const authController = {
       }
     } catch (err) {
       res.status(500).json(err);
+    }
+  },
+
+  loginSuccess: async (req, res) => {
+    const userId = req?.body
+    try {
+      if(!userId) res.status(400).json({
+        err: 1,
+        msg: 'Missing inputs'
+      })
+      const response = await authService.loginSuccessService(userId)
+      //Generate access 
+      const accessToken = authController.generateAccessToken(userId);
+      //Generate refresh token
+      const refreshToken = authController.generateRefreshToken(userId);
+      refreshTokens.push(refreshToken);
+      //STORE REFRESH TOKEN IN COOKIE
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: false,
+        path: "/",
+        sameSite: "strict",
+      })
+      res.status(200).json({...response._doc, accessToken, refreshToken });
+    } catch (error) {
+      res.status(500).json({
+        err: -1,
+        msg: 'Fail at auth controller' + error
+      })
     }
   },
 
@@ -102,7 +131,7 @@ const authController = {
       refreshTokens.push(newRefreshToken);
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        secure:false,
+        secure: false,
         path: "/",
         sameSite: "strict",
       });
